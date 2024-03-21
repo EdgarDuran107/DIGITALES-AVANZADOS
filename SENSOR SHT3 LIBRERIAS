@@ -1,0 +1,16 @@
+#include "mbed.h"
+#include "SHT3X.h"
+
+I2C i2c(PB_9, PB_8); // Configura los pines SDA y SCL para la comunicación I2C
+SHT3X sensor(&i2c);
+
+int main() {
+    while(1) {
+        float temperature, humidity;
+        sensor.get(&temperature, &humidity);
+
+        printf("Temperature: %.2f C, Humidity: %.2f %%\n", temperature, humidity);
+
+        ThisThread::sleep_for(1000ms); // Espera 1 segundo
+    }
+}
