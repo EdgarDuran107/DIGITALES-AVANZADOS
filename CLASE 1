@@ -1,0 +1,86 @@
+/* mbed Microcontroller Library
+ * Copyright (c) 2019 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include "mbed.h"
+#include <cstdio>
+#include "ThisThread.h"
+#include "BufferedSerial.h"
+#include "Thread.h"
+#include "cmsis_os2.h"
+#include "mbed_rtx_conf.h"
+
+
+
+
+// Blinking rate in milliseconds
+#define BLINKING_RATE     500ms
+
+//PROTOTIPOS DE LA FUNCION
+void Func_Tarea_1(void);
+void Func_Tarea_2(void);
+
+//DECLARACION DE TAREAS
+Thread Tarea_1(osPriorityNormal, OS_STACK_SIZE,nullptr,nullptr);
+Thread Tarea_2(osPriorityNormal,  OS_STACK_SIZE,nullptr,nullptr);
+
+//VARIABLES GLOBALES
+char men[20];
+
+
+//PINES Y PUERTOS
+DigitalOut led(LED1);
+BufferedSerial pc(USBTX,USBRX);
+
+
+int main()
+{
+    //INICIALIZAR LAS VARIABLES Y TAREAS
+    sprintf(men, "Hola Mundo\n\r");
+    pc.write(men,12);
+    
+    Tarea_1.start(Func_Tarea_1);
+    Tarea_2.start(Func_Tarea_2);
+    
+    // Initialise the digital pin LED1 as an output
+    DigitalOut led(LED1);
+
+    while (true) {
+        led = !led;
+        ThisThread::sleep_for(BLINKING_RATE);
+    }
+}
+
+
+
+void Func_Tarea_1(void)
+{
+    //VARIABLES LOCALES
+     const char Men_tarea_1[17] ="Correr Tarea 1\n\r";
+
+   while(true)
+    {
+        sprintf(men,Men_tarea_1);
+        pc.write(men,sizeof(men));
+        ThisThread::sleep_for(1s);
+       
+     }
+
+}
+
+
+void Func_Tarea_2(void)
+{
+    //VARIABLES LOCALES
+     const char Men_tarea_2[17] ="Correr Tarea 2\n\r";
+
+   while(true)
+    {
+        sprintf(men,Men_tarea_2);
+        pc.write(men,sizeof(men));
+        ThisThread::sleep_for(1s);
+       
+     }
+
+}
