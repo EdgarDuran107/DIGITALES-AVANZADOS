@@ -1,0 +1,24 @@
+import serial
+import matplotlib.pyplot as plt
+
+# Crear una instancia de Serial
+entrada = serial.Serial('COM9', 9600)  # Cambia 'COM9' al puerto correcto
+
+data_list = []
+
+while True:
+    if entrada.in_waiting > 0:
+        # Leer los datos
+        data = entrada.readline().decode('utf-8').strip()
+
+        # Agregar los datos a la lista
+        data_list.append(int(data))
+
+        # Imprimir los datos
+        print(data)
+
+        # Graficar los datos
+        plt.plot(data_list)
+        plt.pause(0.05)
+
+plt.show()
