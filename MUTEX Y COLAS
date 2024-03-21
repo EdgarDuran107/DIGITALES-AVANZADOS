@@ -1,0 +1,100 @@
+/* mbed Microcontroller Library
+ * Copyright (c) 2019 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include "mbed.h"
+#include <stdio.h>
+//#include "ThisThread.h"
+//#include "BufferedSerial.h"
+//#include "Thread.h"
+//#include "mbed_rtx_conf.h"
+// Blinking rate in milliseconds
+#define BLINKING_RATE     500ms
+// Initialise the digital pin LED1 as an output
+DigitalOut led(LED1);
+
+//PUERTOS
+UnbufferedSerial pc(USBTX, USBRX);
+
+//PROTOTIPOS DE LAS FUNCIONES
+void func_tx_1(void);
+void func_tx_2(void);
+void func_productora(void);
+
+//TAREAS Y FUNCIONESD EL SISTEA OPERATIVO
+Thread th_func_tx_1(osPriorityNormal,OS_STACK_SIZE);
+Thread th_func_tx_2(osPriorityNormal,OS_STACK_SIZE);
+Thread th_func_productora(osPriorityNormal,OS_STACK_SIZE);
+
+Mutex m_serie;
+
+
+typedef struct
+{
+    float_t a;
+
+} cola_data;
+MemoryPool<cola_data, 16>mpool;
+Queue <cola_data,16>queue;
+
+//VARIABLES LOCALES
+char i=0;
+char men[30];
+
+int main()
+{
+    
+    th_func_tx_1.start(func_tx_1);
+    th_func_tx_2.start(func_tx_2);
+
+    while (true) {
+        led = !led;
+        ThisThread::sleep_for(BLINKING_RATE);
+    }
+}
+
+
+
+void func_tx_1(void)
+{
+    const char  men_t1[30]="TAREA 1\n\r";
+
+    while(true)
+    {
+        m_serie.lock();
+        sprintf(men_t1,men);
+        pc.write(men,sizeof(men));
+        m_serie.unlock();
+        ThisThread::sleep_for(1s);
+    }
+}
+
+
+void func_tx_2(void)
+{
+    char men_i[10];
+    const char  men_t2[30]="TAREA 2\n\r";
+
+    while(true)
+    {
+        m_serie.lock();
+        i++;
+        sprintf(men_i,"%04u",i);
+        sprintf(men,men_t2);
+        pc.write(men,sizeof(men));
+        m_serie.unlock();
+        ThisThread::sleep_for(1s);
+    }
+}
+
+void func_productora(void)
+{
+    while(true)
+    {
+        cola_data *queue = mpool.try_alloc();//pedir espacio en la memoria
+        queue->a=(rand()*255);
+    }
+
+
+}
