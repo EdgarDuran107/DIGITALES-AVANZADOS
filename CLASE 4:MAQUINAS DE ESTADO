@@ -1,0 +1,151 @@
+/* mbed Microcontroller Library
+ * Copyright (c) 2019 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include "mbed.h"
+#include <cstdio>
+
+
+// Blinking rate in milliseconds
+#define BLINKING_RATE     500ms
+
+
+//PROTOTIPOS DE LA FUNCION
+void inicio(void);
+void aceleracion(void);
+void establecimiento(void);
+void frenado(void);
+void isr_btn(void);
+
+
+//HILOS Y SEMAAFOROS
+Thread T_inicio(osPriorityNormal,OS_STACK_SIZE);
+Thread T_aceleracion(osPriorityNormal,OS_STACK_SIZE);
+Thread T_establecimiento(osPriorityNormal,OS_STACK_SIZE);
+Thread T_frenado(osPriorityNormal,OS_STACK_SIZE);
+
+
+Semaphore S_inicio(0);
+Semaphore S_aceleracion(0);
+Semaphore S_establecimiento(0);
+Semaphore S_frenado(0);
+
+//PINES Y PUERTOS
+PwmOut motor(LED1);
+InterruptIn b_start(BUTTON1);
+BufferedSerial pc(USBTX,USBRX);
+
+//VARIABLES LOCALES
+float ancho[4]={0.3, 0.5, 0.7, 1.0};
+char men[22];
+unsigned char p_ancho=0;
+
+int main()
+{
+    // Initialise the digital pin LED1 as an output
+    motor.period_ms(1);//motor a 1Khz tipico para motores dc pequenos
+    motor.write(0.0);
+    b_start.fall(isr_btn);
+
+    T_inicio.start(inicio);
+    T_aceleracion.start(aceleracion);
+    T_establecimiento.start(establecimiento);
+    T_frenado.start(frenado);
+
+    sprintf(men," inicio del proceso\n\r");
+    pc.write(men,sizeof(men));
+    S_inicio.release();
+
+    while (true) {
+        
+    }
+}
+
+void inicio(void)
+{
+    char const Men_ini[]={"ESTADO INICIO\n\r"};
+
+    S_inicio.acquire();
+    motor.write(0.0);
+    sprintf(men,Men_ini);
+    pc.write(men,sizeof(men));
+    ThisThread::sleep_for(2s);
+}
+
+void isr_btn(void)
+{
+    S_aceleracion.release();
+}
+
+void aceleracion(void)
+{
+    unsigned char i=0;
+    char const men_ace[]={"ESTADO ACELERACION\n\r"};
+
+    while(true)
+    {
+        S_aceleracion.acquire();
+        p_ancho=0;
+            if(i<3)
+            {
+                motor.write(ancho[p_ancho]);
+                p_ancho++;
+                sprintf(men,men_ace);
+                pc.write(men,sizeof(men));
+                ThisThread::sleep_for(2s);
+            
+                i++;
+            }
+        S_establecimiento.release();
+    }
+   
+}
+
+void establecimiento(void)
+{
+    unsigned char i=0;
+    char const men_est[]={"ESTADO ESTABLECIMIENTO\n\r"};
+
+    while(true)
+    {
+        S_establecimiento.acquire();
+        p_ancho=3;
+            if(i<3)
+            {
+                motor.write(ancho[p_ancho]);
+                
+                sprintf(men,men_est);
+                pc.write(men,sizeof(men));
+                ThisThread::sleep_for(2s);
+            
+                i++;
+            }
+        S_frenado.release();
+    }
+   
+}
+
+void frenado(void)
+{
+    unsigned char i=0;
+    char const men_fre[]={"ESTADO FRENADO\n\r"};
+
+    while(true)
+    {
+        S_frenado.acquire();
+        p_ancho=3;
+            if(i<3)
+            {
+                p_ancho--;
+                motor.write(ancho[p_ancho]);
+                sprintf(men,men_fre);
+                pc.write(men,sizeof(men));
+                ThisThread::sleep_for(2s);
+            
+                i++;
+            }
+        S_aceleracion.release();
+    }
+   
+}
