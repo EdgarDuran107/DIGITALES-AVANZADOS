@@ -1,0 +1,122 @@
+include "mbed.h"
+#include "Semaphore.h"
+#include "Thread.h"
+#include <cstdio>
+ #include "VL53L0X.h"
+
+// Blinking rate in milliseconds
+#define BLINKING_RATE     500ms
+
+//Pines, puertos e interrupciones
+DigitalOut led(LED1);
+DigitalOut trg(D9);
+InterruptIn echo(D10);
+DigitalOut mot1(D5);
+DigitalOut mot2(D6);
+I2C         i2c(PB_9, PB_8);
+VL53L0X     vl_sensor(&i2c);
+DigitalOut  vl_shutdown(D13);
+PwmOut servo(D3);
+BufferedSerial pc(USBTX,USBRX);
+
+//prototipos
+void isr_echo(void);
+void start_sensor(void);
+void read_sensor(void);
+void laser(void);
+
+
+//tareas
+Thread T_start_sensor(osPriorityNormal, OS_STACK_SIZE);
+Thread T_read_sensor(osPriorityNormal, OS_STACK_SIZE);//Debe ser mas prioritaria
+Thread T_sensor(osPriorityNormal, OS_STACK_SIZE);
+Semaphore sensor(0);
+Semaphore s_echo(0);
+
+//variables
+unsigned int Centimetros=0;
+long t_us=0;
+Timer t;
+
+
+int main()
+{
+    //arranque el programa
+    trg=0;
+    t.reset();
+    T_start_sensor.start(start_sensor);
+    T_read_sensor.start(read_sensor);
+    T_sensor.start(laser);
+    echo.fall(isr_echo);
+    mot2=0;
+    /*vl_shutdown = 1;  //turn VL53L0X on
+    vl_sensor.init();
+    vl_sensor.setModeContinuous();
+    vl_sensor.startContinuous();*/
+    servo.period_ms(20);
+    printf("Arranque:\n\r");
+
+    while (true) {
+        led = !led;
+        ThisThread::sleep_for(BLINKING_RATE);
+        //printf("%4i\n\r", vl_sensor.getRangeMillimeters()/10);
+    }
+}
+
+void isr_echo(void)
+{
+    s_echo.release();
+}
+
+void start_sensor(void)
+{
+    while(true)
+    {
+        trg=1;
+        wait_us(10);
+        trg=0;
+        wait_us(200);
+        t.reset();
+        t.start();
+        ThisThread::sleep_for(1s);
+    }
+}
+
+void read_sensor(void)
+{
+    while(true)
+    {
+        s_echo.acquire();
+        t.stop();
+        t_us=t.read_high_resolution_us();
+        Centimetros = int (t_us/58);
+        printf("la distancia en cm es: %03u \n\r", Centimetros);
+
+        if (Centimetros>=10)
+        {
+            mot1=1;
+            servo.pulsewidth_ms(1);
+        }
+        else
+        {
+            mot1=0;
+            servo.pulsewidth_ms(2);
+            sensor.release();
+        }
+
+    }
+}
+
+void laser(void)
+{ 
+    while(true){
+        sensor.acquire();
+        vl_shutdown = 1;  //turn VL53L0X on
+        vl_sensor.init();
+        vl_sensor.setModeContinuous();
+        vl_sensor.startContinuous();
+        printf("sensor");
+        printf("%4i\n\r", vl_sensor.getRangeMillimeters()/10);
+    }
+    
+}
