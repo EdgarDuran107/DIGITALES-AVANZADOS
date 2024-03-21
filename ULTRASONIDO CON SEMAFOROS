@@ -1,0 +1,89 @@
+/* mbed Microcontroller Library
+ * Copyright (c) 2019 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include "mbed.h"
+#include <cstdio>
+#include "Semaphore.h"
+#include "Thread.h"
+
+// Blinking rate in milliseconds
+#define BLINKING_RATE     500ms
+
+//PINES Y PUERTOS
+BufferedSerial pc(USBTX,USBRX);
+DigitalOut led(LED1);
+DigitalOut trg(D8);
+InterruptIn echo(D9);
+
+//PROTOTIPOS
+void isr_echo(void);
+void start_sensor(void);
+void read_sensor(void);
+
+
+
+
+//TAREAS
+Thread T_start_sensor(osPriorityNormal,OS_STACK_SIZE);
+Thread T_read_sensor(osPriorityNormal,OS_STACK_SIZE);
+Semaphore s_echo(0);
+
+
+
+//VARIABLES
+unsigned int centimetros=0;
+long t_us=0;
+Timer t;
+
+
+int main()
+{
+    //ARRANQUE DEL PROGRAMA
+    trg=0;
+    t.reset();
+    T_start_sensor.start(start_sensor);
+    T_read_sensor.start(read_sensor);
+    echo.fall(isr_echo);
+    printf("Arranque:\n\r");
+
+
+    while (true) {
+        led = !led;
+        ThisThread::sleep_for(BLINKING_RATE);
+    }
+}
+
+void isr_echo(void)
+{
+    s_echo.release();
+}
+
+void start_sensor(void)
+{
+
+    while (true) 
+    {
+        trg=1;
+        wait_us(10);
+        trg=0;
+        wait_us(200);
+        t.reset();
+        t.start();
+
+        ThisThread::sleep_for(1s);
+
+    }
+
+
+}
+
+void read_sensor(void)
+{
+    s_echo.acquire();
+    t.stop();
+    t_us = t.read_high_resolution_us();
+    centimetros= int(t_us/58);
+    printf("la distancia en cm es:  %03u",centimetros);
+}
