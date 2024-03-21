@@ -1,0 +1,35 @@
+#include "mbed.h"
+
+#define SHT3X_ADDR 0x44  // Dirección I2C del sensor SHT3X
+
+I2C i2c(PB_9, PB_8);    // Pin SDA (Dato) y SCL (Reloj) respectivamente en la Nucleo-F401RE
+
+// Función para iniciar la comunicación I2C con el sensor
+void init_sht3x() {
+    char cmd[] = {0x24, 0x00};  // Comando de inicio de medida de temperatura y humedad
+    i2c.write(SHT3X_ADDR << 1, cmd, 2);
+}
+
+// Función para leer los datos de temperatura y humedad
+void read_sht3x(float &temp, float &hum) {
+    char cmd[] = {0xE0, 0x00};  // Comando para leer los datos
+    i2c.write(SHT3X_ADDR << 1, cmd, 2);
+    wait_ms(20);  // Esperar a que el sensor tenga los datos listos
+    char data[6];
+    i2c.read(SHT3X_ADDR << 1, data, 6);
+    int rawTemp = (data[0] << 8) | data[1];
+    int rawHum = (data[3] << 8) | data[4];
+    temp = -45 + 175 * (rawTemp / 65535.0);  // Fórmula para convertir datos brutos a temperatura en grados Celsius
+    hum = 100 * (rawHum / 65535.0);          // Fórmula para convertir datos brutos a humedad relativa en porcentaje
+}
+
+int main() {
+    float temp, hum;
+    i2c.frequency(400000);  // Establecer la frecuencia de I2C a 400kHz
+    init_sht3x();           // Iniciar el sensor
+    while (1) {
+        read_sht3x(temp, hum);  // Leer datos de temperatura y humedad
+        printf("Temperatura: %.2f C, Humedad: %.2f %%\n", temp, hum);
+        wait(2);  // Esperar 2 segundos antes de la próxima lectura
+    }
+}
