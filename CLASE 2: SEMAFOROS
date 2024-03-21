@@ -1,0 +1,65 @@
+/* mbed Microcontroller Library
+ * Copyright (c) 2019 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include "mbed.h"
+#include <cstdio>
+#include "ThisThread.h"
+#include "BufferedSerial.h"
+#include "Thread.h"
+#include "cmsis_os2.h"
+#include "mbed_rtx_conf.h"
+
+
+// Blinking rate in milliseconds
+#define BLINKING_RATE_MS        500
+// PINES, PUERTOS E INTERRUPCCIONES
+DigitalOut led(LED1);
+InterruptIn btn(BUTTON1);
+BufferedSerial pc(USBTX,USBRX);
+
+//TAREAS Y SEMAFOROS
+Semaphore pulso(0);
+Thread tarea_hacer_accion(osPriorityNormal,512);
+
+
+//PROTOTIPOS DE LAS FUNCIONES
+void isr_btn(void);  //ATENDER LA INTERRUPCION
+void accion_btn(void); //REALIZAR LA ACCION
+
+
+int main()
+{
+  //CONFIGURARY ARRANCAR
+  tarea_hacer_accion.start(accion_btn);
+  btn.rise(isr_btn);
+  const char saludo[20]="saludo....\n\r";
+
+
+
+    while (true) {
+        led = !led;
+        thread_sleep_for(BLINKING_RATE_MS);
+    }
+}
+
+void isr_btn(void)
+{
+//INSTRUCCION ATOMICA
+pulso.release();
+}
+
+void accion_btn (void)
+{
+ char men[22];
+ //const char men1[22]="se oprimio el boton\n\r";
+ while(true)
+  {
+    pulso.acquire();
+    sprintf(men,"se oprimio el boton\n\r");
+    pc.write(men,22);
+  }
+
+
+}
