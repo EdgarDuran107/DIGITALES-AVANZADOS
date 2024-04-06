@@ -1,24 +1,50 @@
 import serial
+import time
+from tkinter import Button
 import matplotlib.pyplot as plt
 
-# Crear una instancia de Serial
-entrada = serial.Serial('COM9', 9600)  # Cambia 'COM9' al puerto correcto
+# Configura la conexión serial
+ser = serial.Serial('COM9', baudrate=9600)  
 
-data_list = []
+# Variables para almacenar los datos
+LASER = []
+ULTRA = []
+TEMPE = []
+tiempos = []
 
+# Lee los datos del puerto serial
 while True:
-    if entrada.in_waiting > 0:
-        # Leer los datos
-        data = entrada.readline().decode('utf-8').strip()
+    try:
+        # Lee una línea de datos
+        linea = ser.readline().decode().strip()
+        
+        # Divide la línea en dos valores separados por una coma
+        valor1, valor2, valor3 = linea.split(';')
+        # Convierte los valores a números y los agrega a las listas correspondientes
+        LASER.append(float(valor1))
+        ULTRA.append(float(valor2))
+        TEMPE.append(float(valor3))
+        
+        # Agrega el tiempo actual a la lista de tiempos
+        tiempos.append(time.time())
+       
+        # Grafica los datos
+        plt.subplot(2, 2, 1)
+        plt.plot(tiempos, LASER)
+        plt.xlabel('Tiempo')
+        plt.ylabel('LASER')
+        
+        plt.subplot(2, 2, 2)
+        plt.plot(tiempos, ULTRA)
+        plt.xlabel('Tiempo')
+        plt.ylabel('ULTRA')
+        
+        plt.subplot(2, 1, 2)
+        plt.plot(tiempos, TEMPE)
+        plt.xlabel('Tiempo')
+        plt.ylabel('TEMPERATURA')
 
-        # Agregar los datos a la lista
-        data_list.append(int(data))
-
-        # Imprimir los datos
-        print(data)
-
-        # Graficar los datos
-        plt.plot(data_list)
-        plt.pause(0.05)
-
-plt.show()
+        plt.pause(0.01)
+        
+    except KeyboardInterrupt:
+        break
