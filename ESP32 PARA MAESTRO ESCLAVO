@@ -1,0 +1,147 @@
+#LIBRERIA PARA MANEJO DE TIEMPO
+import time
+import network
+import socket
+
+#DIRECCION DEL DISPOSITIVO
+MBED = 0x50
+
+from machine import I2C
+from machine import Pin
+from time import sleep
+
+#CREAR OBJETO I2C EN EL BUS 0
+bus = I2C(0, scl=Pin(22), sda=Pin(21), freq=400000)
+
+#DIRRECCION DEL DISPOSITIVO  ESCLAVO
+mbed=40
+
+# DIRECCION DEL MICRO MBED CORRIDA UNA A LA DERECHA
+print(bus.scan())
+
+
+#----------------------Conexión al punto de acceso------------------------------
+
+#DATOS DE LA RED A CONECTARSE
+essid = 'EDGAR DURAN 2.4G'
+password = 'PollitoAsado90'
+
+#PARA CONECTARSE A UNA RED EXISTENTE
+wlan = network.WLAN(network.STA_IF) 
+print('WLAN creada\n')
+
+wlan.active(True)   #ACTIVAR
+print('WLAN activa\n')
+
+wlan.connect(essid, password)
+print('Conectandose a la red: %s\n' % essid)
+
+while not wlan.isconnected():   #ESPERA A QUE SE CONECTE
+    pass
+print('Conectado a la red: %s' % essid) #CONECTADO
+
+IP = wlan.ifconfig()
+print('IP asignada: %s\n' % IP[0])
+
+#---------------------Creación del servidor web (html)--------------------------
+
+#DECLARCION DE VARIABLES DE IMPRESION
+LASER=[]
+ULTRA=[]
+TEMP=[]
+
+#DECLARA EL SOCKET PARA PUBLICAR EL HTML
+s = socket.socket()
+
+#IP PREVIAMENTE DEFINIDA
+s.bind( ('',80) )
+s.listen(1)
+print('Socket creado')
+print('esperando acceso desde el navegador\n')
+
+#PUBICACION DE PAGINA WEB
+while True:
+    #PLANTILLA HTML
+    template = """<!DOCTYPE html>
+		<html>
+			<head> 
+				<title>LABORATORIO MAESTRO-ESCALVO </title>	
+				<meta name="viewport" content="width=device-width, initial-scale=1">
+			</head>
+
+			<body>
+				<nav class="navbar navbar-danger bg danger">
+					<a class="navbar-brand" href="#">
+						<span class="text-black">MAESTRO(ESP32)-ESCLAVO(MBED)</span>
+					</a>
+				</nav>
+
+				<div class="container">
+					<div class="row">
+						<div class="col-4">
+							<div class="card" style="width: 18rem;">
+								<div class="card-body">
+									<h5 class="card-title">SENSOR 1</h5>
+									<code> LASER: """ + str(LASER) + """ </code>
+									<p class="card-text> SENSOR ULTRASONIDO.</p>
+								</div>
+							</div>
+						</div>
+
+						<div class="col-5">
+							<div class="card" style="width: 18rem;">
+								<div class="card-body">
+									<h5 class="card-title">SENSOR 2</h5>
+									<code>ULTRASONIDO: """ + str(ULTRA) + """</code>
+									<p class="card-text> SENSOR LASER(12C).</p>
+								</div>
+							</div>
+						</div>
+				
+						<div class="col-6">
+							<div class="card" style="width: 18rem;">
+								<div class="card-body">
+									<h5 class="card-title">SENSOR 3</h5>
+									<code> TEMPERATURA: """+ str(TEMP) +"""</code>
+									<p class="card-text> SENSOR RDT.</p>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</body>
+			</html>"""
+
+    #SOLICITUD DE ACCESO EXTERNO
+    conn, addr = s.accept()
+    print('Acceso desde la IP: %s\n' % addr[0])
+    conn.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\n\r\n')
+    print('envio de la cadena de configuracion\n')
+
+    #DECLARCION DE HTML
+    html = template
+    
+    #LECTURA DE LOS DATOS ESCLAVO
+    datos = bus.readfrom(mbed,8)
+    buf = datos.decode("utf-8")
+    print("print",buf)
+    print('Completa la tabla en la plantilla')
+    
+    #DESEMPAQUETADO DE LOS DATOS
+    linea=buf.strip()
+    
+    valor1,valor2,valor3=linea.split(';')
+    LASER.append(int(valor1))
+    ULTRA.append(int(valor2))
+    #TEMP.append(int(valor3))
+    
+    print(LASER)
+    print(ULTRA)
+    print(TEMP)
+    
+    #INICIA LA PAGINA WEB
+    conn.sendall(html)          
+    print('Publicacion del HTML\n')
+    
+    #CIERRA LA COMUNICACION
+    conn.close()   
