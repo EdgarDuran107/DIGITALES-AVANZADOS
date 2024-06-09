@@ -1,0 +1,132 @@
+/* mbed Microcontroller Library
+ * Copyright (c) 2019 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include "mbed.h"
+#include "PinNamesTypes.h"
+#include <cstdio>
+#include <math.h>
+#include <queue>
+
+#define BLINKING_RATE     500ms
+
+// Definir I2C
+#define VL53L0X_I2C_ADDRESS 0x52
+
+// Registros del VL53L0X
+#define VL53L0X_REG_SYSRANGE_START 0x00         //ir al registro de referencia
+#define VL53L0X_REG_RESULT_RANGE_STATUS 0x14
+
+//PINES PUERTOS E INTERRTUPCIONES
+DigitalOut trg(D8);
+DigitalIn echo(D9);
+BufferedSerial pc(USBTX,USBRX);                 //PUERTOS SERIALES
+I2C i2c(D14, D15); // SDA, SCL                  //PUERTOS I2C PARA EL SENSOR DE DISTANCIA LASER
+I2CSlave slave(PC_1, PC_0);// SDA, SCL            // PUERTOS I2C MAESTRO(ESP32)
+
+//PROTOTIPOS DE FUNCINES
+void ultrasonido(void);
+void p_distancia (void);
+
+//HILOS Y TAREAS
+Thread t_ultrasonido (osPriorityNormal, OS_STACK_SIZE);
+Thread t_distancia (osPriorityNormal,OS_STACK_SIZE);
+
+//VARIABLES
+unsigned int centimetros=0;
+int ultra;
+long t_us=0;
+char distancia;
+Timer t;
+char sensores[12];
+
+int main()
+{
+    char buf[10];
+    char msg[] = "Slave!";
+    slave.frequency(400000);
+
+    slave.address(0x50);
+    printf("arranque del sistema\n\r");
+
+    //ARRANQUE DEL PROGRAMA
+    trg=0;
+    t.reset();
+
+    //ARRANQUE DE LOS HILOS
+    t_distancia.start(p_distancia);
+    t_ultrasonido.start(ultrasonido);
+ 
+    //LECTURA Y ESCRITURA PARA MAESTRO ESCLAVO I2C
+    while (1) {
+        //printf("%u; %02u; %i\n\r ", distancia, centimetros, averageTemperature);
+        int i = slave.receive();
+        switch (i) {
+            case I2CSlave::ReadAddressed:
+                sprintf(sensores,"%u; %02u\n\r ", distancia, centimetros);
+                slave.write(sensores,9); // Includes null char
+                //printf("rama_leer\n\r");
+                break;
+            case I2CSlave::WriteGeneral:
+                slave.read(buf, 10);
+                printf("Read G: %s\n", buf);
+                break;
+            case I2CSlave::WriteAddressed:
+                slave.read(buf, 10);
+                printf("Read A: %s\n", buf);
+                break;
+        }
+        for (int i = 0; i < 10; i++) {
+            buf[i] = 0;    // Clear buffer
+        }
+    }
+}
+
+//FUNCION DEL SENSOR LASER
+void p_distancia(void)
+{
+    
+    char cmd[2];
+
+    while(true){
+
+    // Iniciar la medición de distancia
+    cmd[0] = VL53L0X_REG_SYSRANGE_START;//ir al registro de referencia
+    cmd[1] = 0x01;//ir al registro para iniciar el sensor 
+    i2c.write(VL53L0X_I2C_ADDRESS, cmd, 2);
+
+    // Esperar para que el sensor complete la medición
+    wait_us(30000);
+
+    // Leer la distancia medida
+    cmd[0] = VL53L0X_REG_RESULT_RANGE_STATUS;//llamando el valor del sensor guardado en 0x14 de 12 bits
+    i2c.write(VL53L0X_I2C_ADDRESS, cmd, 1);
+    char data[12];
+    i2c.read(VL53L0X_I2C_ADDRESS, data, 12);//leer el valor obtenido en 12 bits
+    int distance = (data[10] << 8) | data[11];//hacer el corriemiento del valor anterior 
+    distancia = distance/10;//convertir el valor de mm a cm 
+    }
+}
+
+//FUNCION DEL ULTRASONIDO
+void ultrasonido(void)
+{
+
+    while (true) 
+    {
+        trg=1;
+        wait_us(10);
+        trg=0;
+        while (!echo){};
+        t.reset();
+        t.start();
+        while(echo){};
+        t.stop();
+        t_us = t.read_high_resolution_us();
+        centimetros= int(t_us/58);
+        
+        ThisThread::sleep_for(1s);
+    }
+
+}
